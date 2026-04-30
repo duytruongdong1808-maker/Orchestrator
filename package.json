@@ -1,0 +1,18 @@
+{
+  "name": "code-orchestrator",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local AI code orchestration app coordinating Codex CLI and Claude Code CLI.",
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c slateblue,tan \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "dev:frontend": "pnpm --filter @code-orchestrator/frontend --fail-if-no-match dev",
+    "dev:backend": "pnpm --filter @code-orchestrator/backend --fail-if-no-match dev",
+    "build": "pnpm --filter @code-orchestrator/backend --fail-if-no-match build && pnpm --filter @code-orchestrator/frontend --fail-if-no-match build",
+    "typecheck": "pnpm --filter @code-orchestrator/backend --fail-if-no-match typecheck && pnpm --filter @code-orchestrator/frontend --fail-if-no-match typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "pnpm@9.12.3"
+}

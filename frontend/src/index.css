@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 42 29% 95%;
+  --foreground: 228 12% 15%;
+  --card: 42 30% 98%;
+  --card-foreground: 225 12% 16%;
+  --muted: 42 21% 90%;
+  --muted-foreground: 225 8% 42%;
+  --primary: 24 63% 50%;
+  --primary-foreground: 40 45% 98%;
+  --border: 36 18% 82%;
+  --input: 36 18% 82%;
+}
+
+.dark {
+  --background: 225 12% 12%;
+  --foreground: 38 22% 91%;
+  --card: 225 12% 15%;
+  --card-foreground: 38 22% 91%;
+  --muted: 225 10% 20%;
+  --muted-foreground: 38 10% 68%;
+  --primary: 25 68% 58%;
+  --primary-foreground: 225 14% 11%;
+  --border: 225 10% 25%;
+  --input: 225 10% 25%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(190, 111, 61, 0.12), transparent 26rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), transparent 18rem),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "liga" 1, "calt" 1;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(225, 139, 78, 0.09), transparent 26rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18rem),
+    hsl(var(--background));
+}
+
+pre,
+code {
+  font-family: theme("fontFamily.mono");
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
