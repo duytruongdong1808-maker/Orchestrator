@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type CliStatus, type Mode, type OrchestrationResult, type Task } from "./api";
+import { api, getStoredApiToken, setStoredApiToken, type CliStatus, type Mode, type OrchestrationResult, type Task } from "./api";
 import { ChatWorkspace } from "./components/chat/ChatWorkspace";
 import type { TimelineStep } from "./components/chat/AgentTimeline";
 import { AppShell } from "./components/layout/AppShell";
@@ -8,7 +8,12 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 
 function timelineFor(mode: Mode, running: boolean, result?: OrchestrationResult, error?: string): TimelineStep[] {
-  const labels = mode === "chat" ? ["Receive", "Think", "Reply"] : ["Validate", "Plan", "Implement", "Review", "Test"];
+  const labels =
+    mode === "chat"
+      ? ["Receive", "Think", "Reply"]
+      : mode === "review"
+        ? ["Validate", "Read diff", "Review"]
+        : ["Validate", "Plan", "Implement", "Review", "Test"];
   if (error) return labels.map((label, index) => ({ label, status: index === 0 ? "failed" : "pending" }));
   if (running) {
     return labels.map((label, index) => ({ label, status: index === 0 ? "running" : "pending" }));
@@ -22,6 +27,7 @@ function timelineFor(mode: Mode, running: boolean, result?: OrchestrationResult,
 
 export default function App() {
   const [projectPath, setProjectPath] = useState("");
+  const [apiToken, setApiToken] = useState(getStoredApiToken);
   const [mode, setMode] = useState<Mode>("full");
   const [task, setTask] = useState("");
   const [lastUserTask, setLastUserTask] = useState("");
@@ -45,6 +51,15 @@ export default function App() {
 
   const timeline = useMemo(() => timelineFor(mode, running, result, error), [mode, running, result, error]);
 
+  function updateApiToken(value: string) {
+    setApiToken(value);
+    setStoredApiToken(value);
+  }
+
+  function isSafeTestCommandSelection(command: string) {
+    return /^(build|test|typecheck|lint)$/i.test(command.trim()) || /^(?:npm|pnpm|yarn)\s+(?:run\s+)?(build|test|typecheck|lint)$/i.test(command.trim());
+  }
+
   async function checkCli() {
     setCheckingCli(true);
     setError(undefined);
@@ -62,13 +77,21 @@ export default function App() {
       setError("Enter a project path before running orchestration.");
       return;
     }
+    if (mode === "review" && testCommand.trim()) {
+      setError("Review mode does not run test commands. Clear the package script selection first.");
+      return;
+    }
+    if (testCommand.trim() && !isSafeTestCommandSelection(testCommand)) {
+      setError("Test command must be one of: build, test, typecheck, lint, or an equivalent npm/pnpm/yarn run command.");
+      return;
+    }
 
     setRunning(true);
     setError(undefined);
     setResult(undefined);
     setLastUserTask(task);
     try {
-      const response = await api.orchestrate({ projectPath, userTask: task, testCommand, mode });
+      const response = await api.orchestrate({ projectPath, userTask: task, testCommand: mode === "review" ? "" : testCommand, mode });
       setResult(response);
       setTasks(await api.listTasks());
     } catch (err) {
@@ -113,9 +136,12 @@ export default function App() {
 
   async function rollback() {
     if (!result) return;
+    if (!window.confirm("Rollback will discard tracked changes and delete untracked files created in this repository for this task. Continue?")) {
+      return;
+    }
     setBusyAction(true);
     try {
-      const updated = await api.rollback(result.task.id);
+      const { task: updated } = await api.rollback(result.task.id);
       setResult({ ...result, task: updated, status: updated.status, finalDiff: "", changedFiles: [] });
       setTasks(await api.listTasks());
     } catch (err) {
@@ -131,11 +157,13 @@ export default function App() {
       sidebar={
         <Sidebar
           projectPath={projectPath}
+          apiToken={apiToken}
           mode={mode}
           tasks={tasks}
           cliStatus={cliStatus}
           checkingCli={checkingCli}
           onProjectPathChange={setProjectPath}
+          onApiTokenChange={updateApiToken}
           onModeChange={setMode}
           onCheckCli={checkCli}
           onSelectTask={selectTask}
@@ -148,6 +176,7 @@ export default function App() {
         userTask={lastUserTask}
         composerTask={task}
         testCommand={testCommand}
+        allowTestCommand={mode !== "review"}
         running={running}
         canRun={Boolean(task.trim() && (mode === "chat" || projectPath.trim()))}
         needsProjectPath={mode !== "chat"}

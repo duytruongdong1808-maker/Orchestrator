@@ -22,6 +22,7 @@ export function RightPanel({
 }) {
   const [tab, setTab] = useState<Tab>("diff");
   const canAct = Boolean(result?.task?.id);
+  const canRollback = Boolean(result?.task?.baseHead && (result.task.mode === "full" || result.task.mode === "codex"));
 
   return (
     <aside className="flex w-[24rem] shrink-0 flex-col overflow-hidden rounded-lg border bg-card/78 shadow-soft backdrop-blur">
@@ -58,7 +59,7 @@ export function RightPanel({
             <ShieldCheck className="h-4 w-4" />
             Approve
           </Button>
-          <Button variant="danger" onClick={onRollback} disabled={!canAct || busy}>
+          <Button variant="danger" onClick={onRollback} disabled={!canAct || !canRollback || busy}>
             <RotateCcw className="h-4 w-4" />
             Rollback
           </Button>

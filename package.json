@@ -8,7 +8,8 @@
     "dev:frontend": "pnpm --filter @code-orchestrator/frontend --fail-if-no-match dev",
     "dev:backend": "pnpm --filter @code-orchestrator/backend --fail-if-no-match dev",
     "build": "pnpm --filter @code-orchestrator/backend --fail-if-no-match build && pnpm --filter @code-orchestrator/frontend --fail-if-no-match build",
-    "typecheck": "pnpm --filter @code-orchestrator/backend --fail-if-no-match typecheck && pnpm --filter @code-orchestrator/frontend --fail-if-no-match typecheck"
+    "typecheck": "pnpm --filter @code-orchestrator/backend --fail-if-no-match typecheck && pnpm --filter @code-orchestrator/frontend --fail-if-no-match typecheck",
+    "test": "pnpm --filter @code-orchestrator/backend --fail-if-no-match test"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

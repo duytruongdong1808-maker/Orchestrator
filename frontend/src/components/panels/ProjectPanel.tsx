@@ -4,12 +4,16 @@ import { Button } from "../ui/button";
 
 export function ProjectPanel({
   projectPath,
+  apiToken,
   onProjectPathChange,
+  onApiTokenChange,
   onCheckCli,
   checking
 }: {
   projectPath: string;
+  apiToken: string;
   onProjectPathChange: (value: string) => void;
+  onApiTokenChange: (value: string) => void;
   onCheckCli: () => void;
   checking: boolean;
 }) {
@@ -26,6 +30,14 @@ export function ProjectPanel({
         value={projectPath}
         onChange={(event) => onProjectPathChange(event.target.value)}
         placeholder="D:\\Projects\\my-app"
+        className="font-mono text-xs"
+      />
+      <Input
+        value={apiToken}
+        onChange={(event) => onApiTokenChange(event.target.value)}
+        placeholder="Local API token"
+        type="password"
+        autoComplete="off"
         className="font-mono text-xs"
       />
       <Button className="w-full" variant="outline" onClick={onCheckCli} disabled={checking}>

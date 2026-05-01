@@ -6,7 +6,7 @@ const modes: Array<{ value: Mode; label: string; detail: string; icon: typeof Br
   { value: "chat", label: "Chat", detail: "Ask without editing files", icon: MessageCircle },
   { value: "full", label: "Full orchestration", detail: "Plan, implement, review", icon: GitPullRequest },
   { value: "codex", label: "Codex only", detail: "Implementation pass", icon: Code2 },
-  { value: "review", label: "Review only", detail: "Plan and diff review", icon: BrainCircuit }
+  { value: "review", label: "Review only", detail: "Review current dirty diff", icon: BrainCircuit }
 ];
 
 export function ModeSelector({ value, onChange }: { value: Mode; onChange: (mode: Mode) => void }) {

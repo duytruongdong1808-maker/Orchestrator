@@ -4,7 +4,6 @@ async function checkBinary(command: string, args: string[] = ["--version"], cwd?
   const result = await execa(command, args, {
     cwd,
     all: true,
-    shell: true,
     reject: false
   });
 

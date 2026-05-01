@@ -25,6 +25,7 @@ export type Task = {
   testCommand?: string | null;
   mode: OrchestrationMode;
   status: string;
+  baseHead?: string | null;
   createdAt: string;
   updatedAt: string;
 };

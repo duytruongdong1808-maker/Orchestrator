@@ -25,6 +25,7 @@ export function ChatWorkspace({
   userTask,
   composerTask,
   testCommand,
+  allowTestCommand,
   running,
   canRun,
   needsProjectPath,
@@ -38,6 +39,7 @@ export function ChatWorkspace({
   userTask?: string;
   composerTask: string;
   testCommand: string;
+  allowTestCommand: boolean;
   running: boolean;
   canRun: boolean;
   needsProjectPath: boolean;
@@ -108,6 +110,7 @@ export function ChatWorkspace({
       <TaskComposer
         task={composerTask}
         testCommand={testCommand}
+        allowTestCommand={allowTestCommand}
         running={running}
         canRun={canRun}
         needsProjectPath={needsProjectPath}

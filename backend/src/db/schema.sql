@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   test_command TEXT,
   mode TEXT NOT NULL,
   status TEXT NOT NULL,
+  base_head TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

@@ -6,21 +6,25 @@ import { TaskHistory } from "../panels/TaskHistory";
 
 export function Sidebar({
   projectPath,
+  apiToken,
   mode,
   tasks,
   cliStatus,
   checkingCli,
   onProjectPathChange,
+  onApiTokenChange,
   onModeChange,
   onCheckCli,
   onSelectTask
 }: {
   projectPath: string;
+  apiToken: string;
   mode: Mode;
   tasks: Task[];
   cliStatus?: CliStatus;
   checkingCli: boolean;
   onProjectPathChange: (value: string) => void;
+  onApiTokenChange: (value: string) => void;
   onModeChange: (mode: Mode) => void;
   onCheckCli: () => void;
   onSelectTask: (task: Task) => void;
@@ -34,7 +38,9 @@ export function Sidebar({
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-4">
         <ProjectPanel
           projectPath={projectPath}
+          apiToken={apiToken}
           onProjectPathChange={onProjectPathChange}
+          onApiTokenChange={onApiTokenChange}
           onCheckCli={onCheckCli}
           checking={checkingCli}
         />

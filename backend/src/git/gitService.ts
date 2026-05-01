@@ -1,5 +1,7 @@
 import { execa } from "execa";
+import fs from "node:fs";
 import { simpleGit } from "simple-git";
+import type { Task } from "../orchestrator/types.js";
 
 export async function ensureGitRepo(projectPath: string) {
   const git = simpleGit(projectPath);
@@ -33,8 +35,25 @@ export async function getChangedFiles(projectPath: string) {
   return [...status.modified, ...status.created, ...status.deleted, ...status.renamed.map((file) => file.to)];
 }
 
-export async function rollbackWorkingTree(projectPath: string) {
+export async function rollbackWorkingTree(task: Task) {
+  if (task.mode !== "full" && task.mode !== "codex") {
+    throw new Error("Rollback is only available for code orchestration tasks.");
+  }
+  if (!task.baseHead) {
+    throw new Error("Rollback is unavailable because this task has no recorded base HEAD.");
+  }
+  if (!fs.existsSync(task.projectPath)) {
+    throw new Error("Rollback failed because the stored project path no longer exists.");
+  }
+
+  await ensureGitRepo(task.projectPath);
+
+  const currentHead = (await getHeadHash(task.projectPath)).trim();
+  if (currentHead !== task.baseHead.trim()) {
+    throw new Error("Rollback refused because the repository HEAD changed after orchestration.");
+  }
+
   // Warning: this deletes untracked files created during orchestration.
-  await execa("git", ["checkout", "--", "."], { cwd: projectPath, shell: true, reject: false });
-  await execa("git", ["clean", "-fd"], { cwd: projectPath, shell: true, reject: false });
+  await execa("git", ["reset", "--hard", task.baseHead], { cwd: task.projectPath, reject: true });
+  await execa("git", ["clean", "-fd"], { cwd: task.projectPath, reject: true });
 }

@@ -6,6 +6,7 @@ import { Textarea } from "../ui/textarea";
 export function TaskComposer({
   task,
   testCommand,
+  allowTestCommand,
   running,
   canRun,
   needsProjectPath,
@@ -15,6 +16,7 @@ export function TaskComposer({
 }: {
   task: string;
   testCommand: string;
+  allowTestCommand: boolean;
   running: boolean;
   canRun: boolean;
   needsProjectPath: boolean;
@@ -36,8 +38,8 @@ export function TaskComposer({
           <Input
             value={testCommand}
             onChange={(event) => onTestCommandChange(event.target.value)}
-            placeholder="Optional test command, e.g. npm test"
-            disabled={running}
+            placeholder={allowTestCommand ? "Optional package script: test, build, typecheck, or lint" : "Review mode does not run package scripts"}
+            disabled={running || !allowTestCommand}
             className="font-mono text-xs"
           />
           <Button className="sm:w-36" onClick={onRun} disabled={running || !canRun}>

@@ -7,6 +7,7 @@ export type Task = {
   testCommand?: string | null;
   mode: Mode;
   status: string;
+  baseHead?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -49,9 +50,27 @@ export type OrchestrationResult = {
   message?: string;
 };
 
+const TOKEN_KEY = "orchestrator.apiToken";
+
+export function getStoredApiToken() {
+  return localStorage.getItem(TOKEN_KEY) ?? "";
+}
+
+export function setStoredApiToken(token: string) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+    return;
+  }
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = getStoredApiToken();
   const response = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "x-orchestrator-token": token } : {})
+    },
     ...options
   });
   const text = await response.text();
@@ -79,5 +98,5 @@ export const api = {
   listTasks: () => request<Task[]>("/api/tasks"),
   getTask: (id: string) => request<{ task: Task; agentRuns: AgentRun[]; diffs: DiffRecord[] }>(`/api/tasks/${id}`),
   approve: (id: string) => request<Task>(`/api/tasks/${id}/approve`, { method: "POST" }),
-  rollback: (id: string) => request<Task>(`/api/tasks/${id}/rollback`, { method: "POST" })
+  rollback: (id: string) => request<{ task: Task; ok: boolean; message: string }>(`/api/tasks/${id}/rollback`, { method: "POST" })
 };

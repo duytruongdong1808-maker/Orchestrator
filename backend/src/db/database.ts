@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   test_command TEXT,
   mode TEXT NOT NULL,
   status TEXT NOT NULL,
+  base_head TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -47,6 +48,11 @@ const db = new DatabaseSync(dbPath);
 db.exec("PRAGMA journal_mode = WAL");
 db.exec(fs.existsSync(schemaPath) ? fs.readFileSync(schemaPath, "utf8") : fallbackSchema);
 
+const taskColumns = db.prepare("PRAGMA table_info(tasks)").all() as Array<{ name: string }>;
+if (!taskColumns.some((column) => column.name === "base_head")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN base_head TEXT");
+}
+
 function now() {
   return new Date().toISOString();
 }
@@ -59,6 +65,7 @@ function mapTask(row: any): Task {
     testCommand: row.test_command,
     mode: row.mode,
     status: row.status,
+    baseHead: row.base_head,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -94,6 +101,7 @@ export const database = {
     testCommand?: string | null;
     mode: OrchestrationMode;
     status: string;
+    baseHead?: string | null;
   }): Task {
     const timestamp = now();
     const task: Task = {
@@ -103,13 +111,14 @@ export const database = {
       testCommand: input.testCommand ?? null,
       mode: input.mode,
       status: input.status,
+      baseHead: input.baseHead ?? null,
       createdAt: timestamp,
       updatedAt: timestamp
     };
 
     db.prepare(
-      `INSERT INTO tasks (id, project_path, user_task, test_command, mode, status, created_at, updated_at)
-       VALUES (@id, @projectPath, @userTask, @testCommand, @mode, @status, @createdAt, @updatedAt)`
+      `INSERT INTO tasks (id, project_path, user_task, test_command, mode, status, base_head, created_at, updated_at)
+       VALUES (@id, @projectPath, @userTask, @testCommand, @mode, @status, @baseHead, @createdAt, @updatedAt)`
     ).run(task as any);
 
     return task;
