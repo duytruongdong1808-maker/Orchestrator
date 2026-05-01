@@ -11,7 +11,7 @@ export function CliStatusPanel({ status }: { status?: CliStatus }) {
 
   return (
     <section className="space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">CLI Status</div>
+      <div className="font-mono text-[11px] font-semibold uppercase text-muted-foreground">Toolchain</div>
       <div className="grid grid-cols-2 gap-2">
         {items.map(([label, ok]) => (
           <Badge key={label} tone={ok === undefined ? "neutral" : ok ? "good" : "bad"} className="justify-between gap-2 py-1.5">

@@ -2,7 +2,7 @@ import { FileCode2 } from "lucide-react";
 
 export function ChangedFiles({ files }: { files: string[] }) {
   if (files.length === 0) {
-    return <div className="rounded-lg border bg-background/45 p-4 text-sm text-muted-foreground">No changed files.</div>;
+    return <div className="rounded-lg border bg-background/45 p-4 font-mono text-xs text-muted-foreground">No changed files.</div>;
   }
 
   return (

@@ -1,4 +1,4 @@
-import type { AgentRun, OrchestrationResult } from "../../api";
+import type { AgentRun, Mode, OrchestrationResult } from "../../api";
 import { AgentTimeline, type TimelineStep } from "./AgentTimeline";
 import { MessageBubble, type MessageKind } from "./MessageBubble";
 import { TaskComposer } from "./TaskComposer";
@@ -15,13 +15,29 @@ function titleForRun(run: AgentRun) {
   }
   if (run.phase === "planning") return "Planning Agent";
   if (run.phase === "review") return "Review Agent";
-  if (run.phase === "chat") return "Chat Agent";
+  if (run.phase === "chat") return "Legacy Chat Agent";
   if (run.phase === "test") return "Test Result";
   return "System";
 }
 
+const modeLabels: Record<Mode, string> = {
+  full: "Full fix",
+  codex: "Codex patch",
+  review: "Review diff"
+};
+
+const pipelineLabels: Record<Mode, string[]> = {
+  full: ["validate", "plan", "patch", "review", "verify"],
+  codex: ["validate", "patch", "verify"],
+  review: ["validate", "read diff", "review"]
+};
+
+const taskTemplates = ["Fix a failing path", "Refactor a module", "Add missing tests", "Review current diff"];
+
 export function ChatWorkspace({
   result,
+  mode,
+  projectPath,
   userTask,
   composerTask,
   testCommand,
@@ -36,6 +52,8 @@ export function ChatWorkspace({
   onRun
 }: {
   result?: OrchestrationResult;
+  mode: Mode;
+  projectPath: string;
   userTask?: string;
   composerTask: string;
   testCommand: string;
@@ -57,10 +75,10 @@ export function ChatWorkspace({
         <div className="mx-auto max-w-4xl">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <div className="text-[15px] font-semibold">Conversation</div>
-              <div className="text-xs text-muted-foreground">Chat, plan, implement, review, then inspect the diff.</div>
+              <div className="text-[15px] font-semibold">Patch Workspace</div>
+              <div className="font-mono text-xs text-muted-foreground">{modeLabels[mode]} / diff-first repair pipeline</div>
             </div>
-            {result ? <div className="rounded-full border bg-muted/40 px-3 py-1 text-xs text-muted-foreground">{result.status}</div> : null}
+            {result ? <div className="rounded-md border bg-muted/40 px-3 py-1 font-mono text-xs text-muted-foreground">{result.status}</div> : null}
           </div>
           <AgentTimeline steps={timeline} />
         </div>
@@ -68,25 +86,39 @@ export function ChatWorkspace({
       <div className="min-h-0 flex-1 overflow-auto px-5 py-6">
         <div className="mx-auto flex max-w-4xl flex-col gap-4">
           {!userTask && runs.length === 0 && !error ? (
-            <div className="rounded-lg border bg-card/86 p-8 shadow-soft">
-              <div className="max-w-xl">
-                <h1 className="text-2xl font-semibold">Ready when you are.</h1>
+            <div className="overflow-hidden rounded-lg border bg-card/86 shadow-soft">
+              <div className="border-b bg-background/40 px-5 py-4">
+                <div className="font-mono text-[11px] uppercase text-primary">Workbench online</div>
+                <h1 className="mt-2 text-2xl font-semibold">Describe the code repair.</h1>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Use Chat for everyday questions, or choose a code mode to coordinate planning, implementation, review, and test results.
+                  Target a repository, choose a repair mode, and run a patch with an optional verifier.
                 </p>
               </div>
-              <div className="mt-6 grid gap-3 text-sm sm:grid-cols-3">
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <div className="font-medium">Chat</div>
-                  <div className="mt-1 text-xs leading-5 text-muted-foreground">Ask without touching files.</div>
+              <div className="grid gap-0 text-sm md:grid-cols-[1.2fr_0.8fr]">
+                <div className="border-b p-5 md:border-b-0 md:border-r">
+                  <div className="font-mono text-[11px] uppercase text-muted-foreground">Selected repository</div>
+                  <div className="mt-2 truncate font-mono text-sm">{projectPath || "No repository selected"}</div>
+                  <div className="mt-5 font-mono text-[11px] uppercase text-muted-foreground">Task templates</div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {taskTemplates.map((template) => (
+                      <div key={template} className="rounded-md border bg-muted/25 px-3 py-2 font-mono text-xs">
+                        {template}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <div className="font-medium">Code</div>
-                  <div className="mt-1 text-xs leading-5 text-muted-foreground">Run a local repair workflow.</div>
-                </div>
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <div className="font-medium">Review</div>
-                  <div className="mt-1 text-xs leading-5 text-muted-foreground">Inspect diffs before approval.</div>
+                <div className="p-5">
+                  <div className="font-mono text-[11px] uppercase text-muted-foreground">Active pipeline</div>
+                  <div className="mt-3 space-y-2">
+                    {pipelineLabels[mode].map((label, index) => (
+                      <div key={label} className="flex items-center gap-3 font-mono text-xs">
+                        <span className="flex h-6 w-6 items-center justify-center rounded border bg-background text-[10px] text-primary">
+                          {index + 1}
+                        </span>
+                        <span>{label}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

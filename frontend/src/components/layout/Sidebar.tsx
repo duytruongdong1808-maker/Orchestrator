@@ -32,8 +32,8 @@ export function Sidebar({
   return (
     <aside className="flex w-[18.5rem] shrink-0 flex-col overflow-hidden rounded-lg border bg-card/78 shadow-soft backdrop-blur">
       <div className="border-b px-4 py-4">
-        <div className="text-[15px] font-semibold">Workspace</div>
-        <div className="text-xs text-muted-foreground">Local chat and code repair</div>
+        <div className="text-[15px] font-semibold">Repair Console</div>
+        <div className="font-mono text-xs text-muted-foreground">Local patch orchestration</div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-4">
         <ProjectPanel

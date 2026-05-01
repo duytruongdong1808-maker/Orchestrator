@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import express from "express";
 import { z } from "zod";
 import { checkCli } from "./agents/cliCheck.js";
@@ -6,6 +9,81 @@ import { rollbackWorkingTree } from "./git/gitService.js";
 import { orchestrateCodeFix } from "./orchestrator/orchestrateCodeFix.js";
 
 const router = express.Router();
+
+type DirectoryEntry = {
+  name: string;
+  path: string;
+};
+
+async function pathExists(candidate: string) {
+  try {
+    await fs.access(candidate);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function getFilesystemRoots(): Promise<DirectoryEntry[]> {
+  const candidates = new Set<string>();
+  candidates.add(process.cwd());
+  const homeDirectory = os.homedir();
+  if (homeDirectory) candidates.add(homeDirectory);
+
+  if (process.platform === "win32") {
+    for (let code = 65; code <= 90; code += 1) {
+      candidates.add(`${String.fromCharCode(code)}:\\`);
+    }
+  } else {
+    candidates.add("/");
+  }
+
+  const roots = await Promise.all(
+    [...candidates].map(async (candidate) => {
+      const resolved = path.resolve(candidate);
+      if (!(await pathExists(resolved))) return undefined;
+      return {
+        name: resolved,
+        path: resolved
+      };
+    })
+  );
+
+  return roots
+    .filter((root): root is DirectoryEntry => Boolean(root))
+    .filter((root, index, all) => all.findIndex((item) => item.path.toLowerCase() === root.path.toLowerCase()) === index)
+    .sort((left, right) => left.path.localeCompare(right.path));
+}
+
+async function listDirectories(directoryPath: string) {
+  const resolved = path.resolve(directoryPath);
+  const stat = await fs.stat(resolved).catch((error: NodeJS.ErrnoException) => {
+    throw new Error(error.code === "ENOENT" ? "Folder not found." : `Unable to access folder: ${error.message}`);
+  });
+
+  if (!stat.isDirectory()) {
+    throw new Error("Selected path is not a folder.");
+  }
+
+  const entries = await fs.readdir(resolved, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+    throw new Error(error.code === "EACCES" || error.code === "EPERM" ? "Access denied for this folder." : `Unable to read folder: ${error.message}`);
+  });
+
+  const directories = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      name: entry.name,
+      path: path.join(resolved, entry.name)
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  const parentPath = path.dirname(resolved);
+  return {
+    path: resolved,
+    parentPath: parentPath === resolved ? null : parentPath,
+    directories
+  };
+}
 
 export function requireApiToken(req: express.Request, res: express.Response, next: express.NextFunction) {
   const configuredToken = process.env.ORCHESTRATOR_API_TOKEN;
@@ -35,6 +113,23 @@ const orchestrateSchema = z.object({
 
 router.get("/health", (_req, res) => {
   res.json({ ok: true, name: "Code Orchestrator" });
+});
+
+router.get("/fs/roots", requireApiToken, async (_req, res, next) => {
+  try {
+    res.json({ roots: await getFilesystemRoots() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/fs/directories", requireApiToken, async (req, res, next) => {
+  try {
+    const directoryPath = z.string().trim().min(1, "Path is required.").parse(req.query.path);
+    res.json(await listDirectories(directoryPath));
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post("/check-cli", requireApiToken, async (req, res, next) => {

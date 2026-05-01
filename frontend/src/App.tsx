@@ -9,11 +9,11 @@ import { TopBar } from "./components/layout/TopBar";
 
 function timelineFor(mode: Mode, running: boolean, result?: OrchestrationResult, error?: string): TimelineStep[] {
   const labels =
-    mode === "chat"
-      ? ["Receive", "Think", "Reply"]
-      : mode === "review"
-        ? ["Validate", "Read diff", "Review"]
-        : ["Validate", "Plan", "Implement", "Review", "Test"];
+    mode === "review"
+      ? ["Validate", "Read diff", "Review"]
+      : mode === "codex"
+        ? ["Validate", "Patch", "Verify"]
+        : ["Validate", "Plan", "Patch", "Review", "Verify"];
   if (error) return labels.map((label, index) => ({ label, status: index === 0 ? "failed" : "pending" }));
   if (running) {
     return labels.map((label, index) => ({ label, status: index === 0 ? "running" : "pending" }));
@@ -73,7 +73,7 @@ export default function App() {
   }
 
   async function run() {
-    if (mode !== "chat" && !projectPath.trim()) {
+    if (!projectPath.trim()) {
       setError("Enter a project path before running orchestration.");
       return;
     }
@@ -106,7 +106,7 @@ export default function App() {
     setTask(selected.userTask);
     setLastUserTask(selected.userTask);
     setTestCommand(selected.testCommand ?? "");
-    setMode(selected.mode);
+    setMode(selected.mode === "chat" ? "full" : selected.mode);
     setError(undefined);
     const detail = await api.getTask(selected.id);
     const finalDiff = detail.diffs[detail.diffs.length - 1]?.diffText ?? "";
@@ -173,13 +173,15 @@ export default function App() {
     >
       <ChatWorkspace
         result={result}
+        mode={mode}
+        projectPath={projectPath}
         userTask={lastUserTask}
         composerTask={task}
         testCommand={testCommand}
         allowTestCommand={mode !== "review"}
         running={running}
-        canRun={Boolean(task.trim() && (mode === "chat" || projectPath.trim()))}
-        needsProjectPath={mode !== "chat"}
+        canRun={Boolean(task.trim() && projectPath.trim())}
+        needsProjectPath
         error={error}
         timeline={timeline}
         onTaskChange={setTask}

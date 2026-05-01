@@ -15,7 +15,7 @@ const icons = {
 
 export function AgentTimeline({ steps }: { steps: TimelineStep[] }) {
   return (
-    <div className="flex gap-2 overflow-x-auto rounded-lg border bg-muted/35 p-1.5">
+    <div className="flex gap-1.5 overflow-x-auto rounded-lg border bg-muted/35 p-1.5">
       {steps.map((step) => {
         const Icon = icons[step.status];
         return (
@@ -37,7 +37,7 @@ export function AgentTimeline({ steps }: { steps: TimelineStep[] }) {
                 step.status === "pending" && "text-muted-foreground"
               )}
             />
-            <span className="truncate text-xs font-medium text-muted-foreground">{step.label}</span>
+            <span className="truncate font-mono text-[11px] font-medium text-muted-foreground">{step.label}</span>
           </div>
         );
       })}

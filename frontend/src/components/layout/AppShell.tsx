@@ -4,7 +4,7 @@ export function AppShell({ topBar, sidebar, children, rightPanel }: { topBar: Re
   return (
     <div className="flex h-screen min-h-0 flex-col overflow-hidden text-foreground">
       {topBar}
-      <div className="flex min-h-0 flex-1 gap-3 overflow-hidden px-3 pb-3">
+      <div className="flex min-h-0 flex-1 gap-2 overflow-hidden p-2">
         {sidebar}
         {children}
         {rightPanel}

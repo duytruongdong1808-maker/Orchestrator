@@ -3,7 +3,7 @@ import { Badge } from "../ui/badge";
 
 export function TestResultPanel({ output, exitCode }: { output?: string; exitCode?: number | null }) {
   if (!output) {
-    return <div className="rounded-lg border bg-background/45 p-4 text-sm text-muted-foreground">No test command was run.</div>;
+    return <div className="rounded-lg border bg-background/45 p-4 font-mono text-xs text-muted-foreground">No verifier was run.</div>;
   }
 
   const passed = exitCode === 0;
@@ -16,7 +16,7 @@ export function TestResultPanel({ output, exitCode }: { output?: string; exitCod
         </div>
         <Badge tone={passed ? "good" : "bad"}>exit {exitCode ?? "unknown"}</Badge>
       </div>
-      <pre className="min-h-0 overflow-auto rounded-lg border bg-background/75 p-3 font-mono text-xs leading-5 text-muted-foreground shadow-inner">
+      <pre className="min-h-0 overflow-auto rounded-lg border bg-background/85 p-3 font-mono text-xs leading-5 text-muted-foreground shadow-inner">
         {output}
       </pre>
     </div>

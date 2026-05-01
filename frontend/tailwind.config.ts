@@ -28,7 +28,7 @@ export default {
         mono: ["JetBrains Mono", "SFMono-Regular", "Consolas", "monospace"]
       },
       boxShadow: {
-        soft: "0 18px 50px rgba(39, 35, 28, 0.08)"
+        soft: "0 18px 50px rgba(4, 47, 46, 0.12)"
       }
     }
   },

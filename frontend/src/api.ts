@@ -1,11 +1,12 @@
-export type Mode = "chat" | "full" | "codex" | "review";
+export type Mode = "full" | "codex" | "review";
+export type LegacyMode = Mode | "chat";
 
 export type Task = {
   id: string;
   projectPath: string;
   userTask: string;
   testCommand?: string | null;
-  mode: Mode;
+  mode: LegacyMode;
   status: string;
   baseHead?: string | null;
   createdAt: string;
@@ -38,6 +39,17 @@ export type CliCheckItem = {
 };
 
 export type CliStatus = Record<"codex" | "claude" | "git" | "node", CliCheckItem>;
+
+export type DirectoryEntry = {
+  name: string;
+  path: string;
+};
+
+export type DirectoryListing = {
+  path: string;
+  parentPath: string | null;
+  directories: DirectoryEntry[];
+};
 
 export type OrchestrationResult = {
   task: Task;
@@ -85,6 +97,9 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<{ ok: boolean; name: string }>("/api/health"),
+  filesystemRoots: () => request<{ roots: DirectoryEntry[] }>("/api/fs/roots"),
+  filesystemDirectories: (path: string) =>
+    request<DirectoryListing>(`/api/fs/directories?${new URLSearchParams({ path }).toString()}`),
   checkCli: (projectPath: string) =>
     request<CliStatus>("/api/check-cli", {
       method: "POST",

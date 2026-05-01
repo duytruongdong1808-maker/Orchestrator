@@ -31,11 +31,11 @@ export function MessageBubble({ kind, title, body }: { kind: MessageKind; title?
           "max-w-[82%] rounded-lg border px-4 py-3 shadow-sm",
           kind === "user" ? "bg-primary text-primary-foreground" : "bg-card/90",
           kind === "codex" && "border-primary/30",
-          kind === "claude" && "border-amber-500/25",
+          kind === "claude" && "border-emerald-500/25",
           kind === "system" && "border-border bg-muted/35"
         )}
       >
-        <div className="mb-1 text-xs font-semibold opacity-80">{title ?? labels[kind]}</div>
+        <div className="mb-1 font-mono text-[11px] font-semibold opacity-80">{title ?? labels[kind]}</div>
         <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{body}</pre>
       </div>
     </div>

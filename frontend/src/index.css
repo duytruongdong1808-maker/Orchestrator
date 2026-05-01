@@ -3,29 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --background: 42 29% 95%;
-  --foreground: 228 12% 15%;
-  --card: 42 30% 98%;
-  --card-foreground: 225 12% 16%;
-  --muted: 42 21% 90%;
-  --muted-foreground: 225 8% 42%;
-  --primary: 24 63% 50%;
-  --primary-foreground: 40 45% 98%;
-  --border: 36 18% 82%;
-  --input: 36 18% 82%;
+  --background: 210 28% 96%;
+  --foreground: 222 32% 10%;
+  --card: 210 28% 99%;
+  --card-foreground: 222 32% 10%;
+  --muted: 210 22% 90%;
+  --muted-foreground: 218 12% 40%;
+  --primary: 178 72% 35%;
+  --primary-foreground: 180 45% 98%;
+  --border: 213 19% 82%;
+  --input: 213 19% 82%;
 }
 
 .dark {
-  --background: 225 12% 12%;
-  --foreground: 38 22% 91%;
-  --card: 225 12% 15%;
-  --card-foreground: 38 22% 91%;
-  --muted: 225 10% 20%;
-  --muted-foreground: 38 10% 68%;
-  --primary: 25 68% 58%;
-  --primary-foreground: 225 14% 11%;
-  --border: 225 10% 25%;
-  --input: 225 10% 25%;
+  --background: 222 28% 7%;
+  --foreground: 190 28% 92%;
+  --card: 222 24% 10%;
+  --card-foreground: 190 28% 92%;
+  --muted: 218 21% 15%;
+  --muted-foreground: 194 12% 65%;
+  --primary: 176 82% 47%;
+  --primary-foreground: 222 32% 8%;
+  --border: 217 20% 22%;
+  --input: 217 20% 22%;
 }
 
 * {
@@ -37,18 +37,20 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 12% 0%, rgba(190, 111, 61, 0.12), transparent 26rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.32), transparent 18rem),
+    linear-gradient(90deg, rgba(15, 118, 110, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(15, 118, 110, 0.04) 1px, transparent 1px),
     hsl(var(--background));
+  background-size: 32px 32px;
   color: hsl(var(--foreground));
   font-feature-settings: "liga" 1, "calt" 1;
 }
 
 .dark body {
   background:
-    radial-gradient(circle at 12% 0%, rgba(225, 139, 78, 0.09), transparent 26rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18rem),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(45, 212, 191, 0.045) 1px, transparent 1px),
     hsl(var(--background));
+  background-size: 32px 32px;
 }
 
 pre,
