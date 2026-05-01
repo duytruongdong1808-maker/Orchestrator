@@ -153,12 +153,12 @@ router.post("/orchestrate", requireApiToken, async (req, res, next) => {
   }
 });
 
-router.get("/tasks", (_req, res) => {
+router.get("/tasks", requireApiToken, (_req, res) => {
   res.json(database.listTasks());
 });
 
-router.get("/tasks/:id", (req, res) => {
-  const task = database.getTask(req.params.id);
+router.get("/tasks/:id", requireApiToken, (req, res) => {
+  const task = database.getTask(String(req.params.id));
   if (!task) {
     res.status(404).json({ error: "Task not found" });
     return;
@@ -170,8 +170,8 @@ router.get("/tasks/:id", (req, res) => {
   });
 });
 
-router.post("/tasks/:id/approve", (req, res) => {
-  const task = database.getTask(req.params.id);
+router.post("/tasks/:id/approve", requireApiToken, (req, res) => {
+  const task = database.getTask(String(req.params.id));
   if (!task) {
     res.status(404).json({ error: "Task not found" });
     return;

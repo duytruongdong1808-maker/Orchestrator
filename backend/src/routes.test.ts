@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import express from "express";
+import { database } from "./db/database.js";
 import { requireApiToken, router } from "./routes.js";
 
 async function withProtectedServer(run: (baseUrl: string) => Promise<void>) {
@@ -161,5 +162,56 @@ test("filesystem directories returns a clean error for invalid paths", async () 
     assert.equal(response.status, 400);
     const body = (await response.json()) as { error: string };
     assert.match(body.error, /Folder not found|Unable to access folder/);
+  });
+});
+
+test("task routes reject missing and wrong tokens", async () => {
+  process.env.ORCHESTRATOR_API_TOKEN = "correct-token";
+  const task = database.createTask({
+    projectPath: os.tmpdir(),
+    userTask: `protected task ${randomUUID()}`,
+    mode: "full",
+    status: "completed"
+  });
+
+  await withRouterServer(async (baseUrl) => {
+    assert.equal((await fetch(`${baseUrl}/api/tasks`)).status, 401);
+    assert.equal((await fetch(`${baseUrl}/api/tasks/${task.id}`)).status, 401);
+    assert.equal((await fetch(`${baseUrl}/api/tasks/${task.id}/approve`, { method: "POST" })).status, 401);
+
+    const wrongTokenHeaders = { "x-orchestrator-token": "wrong-token" };
+    assert.equal((await fetch(`${baseUrl}/api/tasks`, { headers: wrongTokenHeaders })).status, 401);
+    assert.equal((await fetch(`${baseUrl}/api/tasks/${task.id}`, { headers: wrongTokenHeaders })).status, 401);
+    assert.equal(
+      (await fetch(`${baseUrl}/api/tasks/${task.id}/approve`, { method: "POST", headers: wrongTokenHeaders })).status,
+      401
+    );
+  });
+});
+
+test("task routes accept the configured token", async () => {
+  process.env.ORCHESTRATOR_API_TOKEN = "correct-token";
+  const task = database.createTask({
+    projectPath: os.tmpdir(),
+    userTask: `accepted task ${randomUUID()}`,
+    mode: "codex",
+    status: "completed"
+  });
+  const headers = { "x-orchestrator-token": "correct-token" };
+
+  await withRouterServer(async (baseUrl) => {
+    const listResponse = await fetch(`${baseUrl}/api/tasks`, { headers });
+    assert.equal(listResponse.status, 200);
+
+    const detailResponse = await fetch(`${baseUrl}/api/tasks/${task.id}`, { headers });
+    assert.equal(detailResponse.status, 200);
+    const detail = (await detailResponse.json()) as { task: { id: string } };
+    assert.equal(detail.task.id, task.id);
+
+    const approveResponse = await fetch(`${baseUrl}/api/tasks/${task.id}/approve`, { method: "POST", headers });
+    assert.equal(approveResponse.status, 200);
+    const approved = (await approveResponse.json()) as { id: string; status: string };
+    assert.equal(approved.id, task.id);
+    assert.equal(approved.status, "approved");
   });
 });

@@ -19,6 +19,9 @@ function timelineFor(mode: Mode, running: boolean, result?: OrchestrationResult,
     return labels.map((label, index) => ({ label, status: index === 0 ? "running" : "pending" }));
   }
   if (result) {
+    if (result.status === "tests_failed") {
+      return labels.map((label) => ({ label, status: label === "Verify" ? "failed" : "complete" }));
+    }
     const failed = result.status === "failed";
     return labels.map((label) => ({ label, status: failed ? "failed" : "complete" }));
   }
@@ -46,8 +49,12 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
+    if (!apiToken) {
+      setTasks([]);
+      return;
+    }
     api.listTasks().then(setTasks).catch(() => undefined);
-  }, []);
+  }, [apiToken]);
 
   const timeline = useMemo(() => timelineFor(mode, running, result, error), [mode, running, result, error]);
 

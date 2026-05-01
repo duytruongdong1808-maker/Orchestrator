@@ -25,14 +25,41 @@ export async function getHeadHash(projectPath: string) {
 }
 
 export async function getDiff(projectPath: string) {
-  const git = simpleGit(projectPath);
-  return git.diff(["--no-ext-diff"]);
+  const trackedDiff = await execa("git", ["diff", "--no-ext-diff", "--binary", "HEAD", "--"], {
+    cwd: projectPath,
+    reject: true
+  });
+  const untrackedFiles = await execa("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
+    cwd: projectPath,
+    reject: true
+  });
+
+  const untrackedDiffs = await Promise.all(
+    untrackedFiles.stdout
+      .split("\0")
+      .filter(Boolean)
+      .map(async (filePath) => {
+        const result = await execa("git", ["diff", "--no-index", "--binary", "--", "/dev/null", filePath], {
+          cwd: projectPath,
+          reject: false
+        });
+        return result.stdout;
+      })
+  );
+
+  return [trackedDiff.stdout, ...untrackedDiffs].filter(Boolean).join("\n");
 }
 
 export async function getChangedFiles(projectPath: string) {
   const git = simpleGit(projectPath);
   const status = await git.status();
-  return [...status.modified, ...status.created, ...status.deleted, ...status.renamed.map((file) => file.to)];
+  return [
+    ...status.modified,
+    ...status.created,
+    ...status.deleted,
+    ...status.not_added,
+    ...status.renamed.map((file) => file.to)
+  ];
 }
 
 export async function rollbackWorkingTree(task: Task) {
