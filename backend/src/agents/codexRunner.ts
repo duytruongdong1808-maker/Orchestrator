@@ -2,9 +2,10 @@ import { execa } from "execa";
 import type { CliRunResult } from "../orchestrator/types.js";
 
 export async function runCodex(cwd: string, prompt: string): Promise<CliRunResult> {
-  const result = await execa("codex", ["exec", prompt], {
+  const result = await execa("codex", ["exec", "-"], {
     cwd,
     all: true,
+    input: prompt,
     shell: false,
     reject: false
   });
