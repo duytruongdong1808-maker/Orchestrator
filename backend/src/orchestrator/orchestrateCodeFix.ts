@@ -1,4 +1,4 @@
-import { execa } from "execa";
+import { runCliCommand, type CliRunObserver } from "../agents/cliRunner.js";
 import { runClaude } from "../agents/claudeRunner.js";
 import { runCodex } from "../agents/codexRunner.js";
 import { database } from "../db/database.js";
@@ -18,22 +18,18 @@ function reviewNeedsRevision(output: string) {
   return /VERDICT:\s*(NEEDS_CHANGES|CRITICAL)/i.test(output);
 }
 
-async function runTestCommand(cwd: string, command?: string | null): Promise<CliRunResult | undefined> {
+async function runTestCommand(cwd: string, command?: string | null, onEvent?: CliRunObserver): Promise<CliRunResult | undefined> {
   const safeScript = resolveSafePackageScript(cwd, command);
   if (!safeScript) return undefined;
 
-  const result = await execa(safeScript.command, safeScript.args, {
+  return runCliCommand({
     cwd,
-    all: true,
-    reject: false
+    command: safeScript.command,
+    args: safeScript.args,
+    agentName: "System",
+    phase: "test",
+    onEvent
   });
-
-  return {
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
-    output: result.all ?? [result.stdout, result.stderr].filter(Boolean).join("\n"),
-    exitCode: result.exitCode ?? null
-  };
 }
 
 function throwIfCliFailed(agentName: string, phase: string, result: CliRunResult) {
@@ -47,7 +43,7 @@ export async function orchestrateCodeFix(input: {
   userTask: string;
   testCommand?: string | null;
   mode: OrchestrationMode;
-}): Promise<OrchestrationResult> {
+}, options: { onEvent?: CliRunObserver } = {}): Promise<OrchestrationResult> {
   if (input.mode === "full" || input.mode === "codex") {
     resolveSafePackageScript(input.projectPath || process.cwd(), input.testCommand);
   }
@@ -63,7 +59,7 @@ export async function orchestrateCodeFix(input: {
 
     try {
       const prompt = buildClaudeChatPrompt(input.userTask);
-      const result = await runClaude(input.projectPath || process.cwd(), prompt);
+      const result = await runClaude(input.projectPath || process.cwd(), prompt, "chat", options.onEvent);
       database.addAgentRun({
         taskId: task.id,
         agentName: "Claude",
@@ -122,7 +118,7 @@ export async function orchestrateCodeFix(input: {
 
       if (reviewDiff.trim()) {
         const reviewPrompt = buildClaudeReviewPrompt(input.userTask, filterSensitiveDiffForPrompt(reviewDiff));
-        const reviewResult = await runClaude(input.projectPath, reviewPrompt);
+        const reviewResult = await runClaude(input.projectPath, reviewPrompt, "review", options.onEvent);
         addRun("Claude", "review", reviewPrompt, reviewResult);
         throwIfCliFailed("Claude", "review", reviewResult);
       }
@@ -145,7 +141,7 @@ export async function orchestrateCodeFix(input: {
     let plan = "No Claude planning run for this mode.";
     if (input.mode === "full") {
       const prompt = buildClaudePlanningPrompt(input.userTask);
-      const result = await runClaude(input.projectPath, prompt);
+      const result = await runClaude(input.projectPath, prompt, "planning", options.onEvent);
       addRun("Claude", "planning", prompt, result);
       throwIfCliFailed("Claude", "planning", result);
       plan = result.output;
@@ -153,7 +149,7 @@ export async function orchestrateCodeFix(input: {
 
     if (input.mode === "full" || input.mode === "codex") {
       const prompt = buildCodexImplementationPrompt(input.userTask, plan);
-      const result = await runCodex(input.projectPath, prompt);
+      const result = await runCodex(input.projectPath, prompt, "implementation", options.onEvent);
       addRun("Codex", "implementation", prompt, result);
       throwIfCliFailed("Codex", "implementation", result);
     }
@@ -164,14 +160,14 @@ export async function orchestrateCodeFix(input: {
     let review = "Review skipped for codex-only mode.";
     if (input.mode === "full") {
       const reviewPrompt = buildClaudeReviewPrompt(input.userTask, filterSensitiveDiffForPrompt(firstDiff));
-      const reviewResult = await runClaude(input.projectPath, reviewPrompt);
+      const reviewResult = await runClaude(input.projectPath, reviewPrompt, "review", options.onEvent);
       addRun("Claude", "review", reviewPrompt, reviewResult);
       throwIfCliFailed("Claude", "review", reviewResult);
       review = reviewResult.output;
 
       if (input.mode === "full" && reviewNeedsRevision(review)) {
         const revisionPrompt = buildCodexRevisionPrompt(input.userTask, filterSensitiveDiffForPrompt(firstDiff), review);
-        const revisionResult = await runCodex(input.projectPath, revisionPrompt);
+        const revisionResult = await runCodex(input.projectPath, revisionPrompt, "revision", options.onEvent);
         addRun("Codex", "revision", revisionPrompt, revisionResult);
         throwIfCliFailed("Codex", "revision", revisionResult);
       }
@@ -180,7 +176,7 @@ export async function orchestrateCodeFix(input: {
     const finalDiff = await getDiff(input.projectPath);
     database.addDiff({ taskId: task.id, phase: "final", diffText: finalDiff });
 
-    const testResult = await runTestCommand(input.projectPath, input.testCommand);
+    const testResult = await runTestCommand(input.projectPath, input.testCommand, options.onEvent);
     if (testResult) {
       addRun("System", "test", input.testCommand ?? "", testResult);
     }

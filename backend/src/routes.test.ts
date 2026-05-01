@@ -9,6 +9,40 @@ import express from "express";
 import { database } from "./db/database.js";
 import { requireApiToken, router } from "./routes.js";
 
+function pathEnvKey() {
+  return Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+}
+
+async function withFakeClaude(run: () => Promise<void>) {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "orchestrator-claude-"));
+  const shellPath = path.join(dir, "claude");
+  const cmdPath = path.join(dir, "claude.cmd");
+
+  await fs.writeFile(shellPath, "#!/bin/sh\ncat >/dev/null\necho \"claude live stdout\"\necho \"claude live stderr\" >&2\n");
+  await fs.chmod(shellPath, 0o755);
+  await fs.writeFile(cmdPath, "@echo off\r\nmore > nul\r\necho claude live stdout\r\necho claude live stderr 1>&2\r\n");
+
+  const key = pathEnvKey();
+  const originalPath = process.env[key];
+  process.env[key] = `${dir}${path.delimiter}${originalPath ?? ""}`;
+
+  try {
+    await run();
+  } finally {
+    process.env[key] = originalPath;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function readNdjson(response: Response) {
+  const text = await response.text();
+  return text
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, any>);
+}
+
 async function withProtectedServer(run: (baseUrl: string) => Promise<void>) {
   const app = express();
   app.get("/protected", requireApiToken, (_req, res) => {
@@ -177,15 +211,10 @@ test("task routes reject missing and wrong tokens", async () => {
   await withRouterServer(async (baseUrl) => {
     assert.equal((await fetch(`${baseUrl}/api/tasks`)).status, 401);
     assert.equal((await fetch(`${baseUrl}/api/tasks/${task.id}`)).status, 401);
-    assert.equal((await fetch(`${baseUrl}/api/tasks/${task.id}/approve`, { method: "POST" })).status, 401);
 
     const wrongTokenHeaders = { "x-orchestrator-token": "wrong-token" };
     assert.equal((await fetch(`${baseUrl}/api/tasks`, { headers: wrongTokenHeaders })).status, 401);
     assert.equal((await fetch(`${baseUrl}/api/tasks/${task.id}`, { headers: wrongTokenHeaders })).status, 401);
-    assert.equal(
-      (await fetch(`${baseUrl}/api/tasks/${task.id}/approve`, { method: "POST", headers: wrongTokenHeaders })).status,
-      401
-    );
   });
 });
 
@@ -197,21 +226,71 @@ test("task routes accept the configured token", async () => {
     mode: "codex",
     status: "completed"
   });
+  database.addDiff({
+    taskId: task.id,
+    phase: "final",
+    diffText: [
+      "diff --git a/src/app.ts b/src/app.ts",
+      "@@ -1 +1 @@",
+      "-old",
+      "+new",
+      "diff --git a/src/view.tsx b/src/view.tsx"
+    ].join("\n")
+  });
+  database.addAgentRun({
+    taskId: task.id,
+    agentName: "System",
+    phase: "test",
+    prompt: "test",
+    output: "tests passed",
+    exitCode: 0
+  });
   const headers = { "x-orchestrator-token": "correct-token" };
 
   await withRouterServer(async (baseUrl) => {
     const listResponse = await fetch(`${baseUrl}/api/tasks`, { headers });
     assert.equal(listResponse.status, 200);
 
+    const scopedListResponse = await fetch(`${baseUrl}/api/tasks?projectPath=${encodeURIComponent(task.projectPath)}`, { headers });
+    assert.equal(scopedListResponse.status, 200);
+    const scopedTasks = (await scopedListResponse.json()) as Array<{ id: string }>;
+    assert.ok(scopedTasks.some((item) => item.id === task.id));
+
     const detailResponse = await fetch(`${baseUrl}/api/tasks/${task.id}`, { headers });
     assert.equal(detailResponse.status, 200);
-    const detail = (await detailResponse.json()) as { task: { id: string } };
+    const detail = (await detailResponse.json()) as { task: { id: string }; changedFiles: string[]; testResult?: { output: string; exitCode: number | null } };
     assert.equal(detail.task.id, task.id);
+    assert.deepEqual(detail.changedFiles, ["src/app.ts", "src/view.tsx"]);
+    assert.deepEqual(detail.testResult, { output: "tests passed", exitCode: 0 });
+  });
+});
 
-    const approveResponse = await fetch(`${baseUrl}/api/tasks/${task.id}/approve`, { method: "POST", headers });
-    assert.equal(approveResponse.status, 200);
-    const approved = (await approveResponse.json()) as { id: string; status: string };
-    assert.equal(approved.id, task.id);
-    assert.equal(approved.status, "approved");
+test("stream orchestration emits terminal transcript events", async () => {
+  process.env.ORCHESTRATOR_API_TOKEN = "correct-token";
+  const userTask = `stream task ${randomUUID()}`;
+
+  await withFakeClaude(async () => {
+    await withRouterServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/orchestrate/stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-orchestrator-token": "correct-token"
+        },
+        body: JSON.stringify({ projectPath: "", userTask, mode: "chat" })
+      });
+
+      assert.equal(response.status, 200);
+      const events = await readNdjson(response);
+
+      assert.ok(events.some((event) => event.type === "run_start" && event.command === "claude"));
+      assert.ok(events.some((event) => event.type === "stdin" && String(event.content).includes(userTask)));
+      assert.ok(events.some((event) => event.type === "output" && /claude live stdout|claude live stderr/.test(String(event.content))));
+      assert.ok(events.some((event) => event.type === "run_end" && event.exitCode === 0));
+
+      const resultEvent = events.find((event) => event.type === "orchestration_result");
+      assert.equal(resultEvent?.result?.status, "completed");
+      assert.equal(resultEvent?.result?.agentRuns?.[0]?.agentName, "Claude");
+    });
   });
 });

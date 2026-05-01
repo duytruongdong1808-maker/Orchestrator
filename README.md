@@ -41,11 +41,10 @@ Backend:
 6. Enter an optional package script name such as `test`, `build`, `typecheck`, or `lint`
 7. Run orchestration
 8. Review diff
-9. Approve or rollback
 
 ## Safety Notes
 
-Code Orchestrator requires a clean git working tree before AI orchestration starts. Rollback uses git checkout and clean commands, so it can delete untracked files created during a task.
+Code Orchestrator requires a clean git working tree before AI orchestration starts.
 
 The app blocks obviously destructive test commands and avoids sending sensitive file names such as `.env`, private keys, and service account files in AI review prompts.
 

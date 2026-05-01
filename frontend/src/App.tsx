@@ -1,11 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, getStoredApiToken, setStoredApiToken, type CliStatus, type Mode, type OrchestrationResult, type Task } from "./api";
+import { api, getStoredApiToken, setStoredApiToken, type CliStatus, type Mode, type OrchestrationResult, type Task, type TerminalEvent } from "./api";
 import { ChatWorkspace } from "./components/chat/ChatWorkspace";
 import type { TimelineStep } from "./components/chat/AgentTimeline";
 import { AppShell } from "./components/layout/AppShell";
 import { RightPanel } from "./components/layout/RightPanel";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
+
+const SIDEBAR_OPEN_KEY = "orchestrator.sidebarOpen";
+const INSPECTOR_OPEN_KEY = "orchestrator.inspectorOpen";
+
+function getStoredPanelState(key: string) {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored === "true") return true;
+    if (stored === "false") return false;
+  } catch {
+    // Storage can be unavailable in private/sandboxed browser contexts.
+  }
+  return window.matchMedia?.("(min-width: 1024px)")?.matches ?? true;
+}
+
+function storePanelState(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // Ignore persistence failures; panel state still works for this session.
+  }
+}
+
+function mergeTasks(...taskLists: Task[][]) {
+  const byId = new Map<string, Task>();
+  for (const task of taskLists.flat()) {
+    byId.set(task.id, task);
+  }
+  return [...byId.values()].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+}
 
 function timelineFor(mode: Mode, running: boolean, result?: OrchestrationResult, error?: string): TimelineStep[] {
   const labels =
@@ -38,15 +68,26 @@ export default function App() {
   const [cliStatus, setCliStatus] = useState<CliStatus>();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [result, setResult] = useState<OrchestrationResult>();
+  const [terminalEvents, setTerminalEvents] = useState<TerminalEvent[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>();
   const [running, setRunning] = useState(false);
-  const [busyAction, setBusyAction] = useState(false);
   const [checkingCli, setCheckingCli] = useState(false);
   const [error, setError] = useState<string>();
-  const [dark, setDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+  const [dark, setDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => getStoredPanelState(SIDEBAR_OPEN_KEY));
+  const [inspectorOpen, setInspectorOpen] = useState(() => getStoredPanelState(INSPECTOR_OPEN_KEY));
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
+
+  useEffect(() => {
+    storePanelState(SIDEBAR_OPEN_KEY, sidebarOpen);
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    storePanelState(INSPECTOR_OPEN_KEY, inspectorOpen);
+  }, [inspectorOpen]);
 
   useEffect(() => {
     if (!apiToken) {
@@ -55,6 +96,16 @@ export default function App() {
     }
     api.listTasks().then(setTasks).catch(() => undefined);
   }, [apiToken]);
+
+  useEffect(() => {
+    if (!apiToken || !projectPath.trim()) return;
+
+    const timeout = window.setTimeout(() => {
+      api.listTasks(projectPath).then((projectTasks) => setTasks((current) => mergeTasks(current, projectTasks))).catch(() => undefined);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [apiToken, projectPath]);
 
   const timeline = useMemo(() => timelineFor(mode, running, result, error), [mode, running, result, error]);
 
@@ -96,11 +147,18 @@ export default function App() {
     setRunning(true);
     setError(undefined);
     setResult(undefined);
+    setTerminalEvents([]);
+    setSelectedTaskId(undefined);
     setLastUserTask(task);
     try {
-      const response = await api.orchestrate({ projectPath, userTask: task, testCommand: mode === "review" ? "" : testCommand, mode });
+      const response = await api.orchestrateStream(
+        { projectPath, userTask: task, testCommand: mode === "review" ? "" : testCommand, mode },
+        (event) => setTerminalEvents((current) => [...current, event])
+      );
       setResult(response);
-      setTasks(await api.listTasks());
+      setSelectedTaskId(response.task.id);
+      const [allTasks, projectTasks] = await Promise.all([api.listTasks(), api.listTasks(projectPath)]);
+      setTasks(mergeTasks(allTasks, projectTasks));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Run failed.");
     } finally {
@@ -109,64 +167,56 @@ export default function App() {
   }
 
   async function selectTask(selected: Task) {
-    setProjectPath(selected.projectPath);
-    setTask(selected.userTask);
-    setLastUserTask(selected.userTask);
-    setTestCommand(selected.testCommand ?? "");
-    setMode(selected.mode === "chat" ? "full" : selected.mode);
     setError(undefined);
-    const detail = await api.getTask(selected.id);
-    const finalDiff = detail.diffs[detail.diffs.length - 1]?.diffText ?? "";
-    setResult({
-      task: detail.task,
-      agentRuns: detail.agentRuns,
-      diffs: detail.diffs,
-      finalDiff,
-      changedFiles: [],
-      status: detail.task.status
-    });
-  }
-
-  async function approve() {
-    if (!result) return;
-    setBusyAction(true);
+    setTerminalEvents([]);
     try {
-      const updated = await api.approve(result.task.id);
-      setResult({ ...result, task: updated, status: updated.status });
-      setTasks(await api.listTasks());
+      const detail = await api.getTask(selected.id);
+      const finalDiff = detail.diffs[detail.diffs.length - 1]?.diffText ?? "";
+      setProjectPath(detail.task.projectPath);
+      setTask(detail.task.userTask);
+      setLastUserTask(detail.task.userTask);
+      setTestCommand(detail.task.testCommand ?? "");
+      setMode(detail.task.mode === "chat" ? "full" : detail.task.mode);
+      setSelectedTaskId(detail.task.id);
+      setResult({
+        task: detail.task,
+        agentRuns: detail.agentRuns,
+        diffs: detail.diffs,
+        finalDiff,
+        changedFiles: detail.changedFiles,
+        testResult: detail.testResult,
+        status: detail.task.status
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Approve failed.");
-    } finally {
-      setBusyAction(false);
-    }
-  }
-
-  async function rollback() {
-    if (!result) return;
-    if (!window.confirm("Rollback will discard tracked changes and delete untracked files created in this repository for this task. Continue?")) {
-      return;
-    }
-    setBusyAction(true);
-    try {
-      const { task: updated } = await api.rollback(result.task.id);
-      setResult({ ...result, task: updated, status: updated.status, finalDiff: "", changedFiles: [] });
-      setTasks(await api.listTasks());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Rollback failed.");
-    } finally {
-      setBusyAction(false);
+      setSelectedTaskId(undefined);
+      setError(err instanceof Error ? err.message : "Unable to open patch history item.");
     }
   }
 
   return (
     <AppShell
-      topBar={<TopBar projectPath={projectPath} dark={dark} onToggleTheme={() => setDark((value) => !value)} />}
+      sidebarOpen={sidebarOpen}
+      inspectorOpen={inspectorOpen}
+      onCloseSidebar={() => setSidebarOpen(false)}
+      onCloseInspector={() => setInspectorOpen(false)}
+      topBar={
+        <TopBar
+          projectPath={projectPath}
+          dark={dark}
+          sidebarOpen={sidebarOpen}
+          inspectorOpen={inspectorOpen}
+          onToggleSidebar={() => setSidebarOpen((value) => !value)}
+          onToggleInspector={() => setInspectorOpen((value) => !value)}
+          onToggleTheme={() => setDark((value) => !value)}
+        />
+      }
       sidebar={
         <Sidebar
           projectPath={projectPath}
           apiToken={apiToken}
           mode={mode}
           tasks={tasks}
+          selectedTaskId={selectedTaskId}
           cliStatus={cliStatus}
           checkingCli={checkingCli}
           onProjectPathChange={setProjectPath}
@@ -176,12 +226,11 @@ export default function App() {
           onSelectTask={selectTask}
         />
       }
-      rightPanel={<RightPanel result={result} onApprove={approve} onRollback={rollback} busy={busyAction} />}
+      rightPanel={<RightPanel result={result} />}
     >
       <ChatWorkspace
         result={result}
         mode={mode}
-        projectPath={projectPath}
         userTask={lastUserTask}
         composerTask={task}
         testCommand={testCommand}
@@ -190,6 +239,7 @@ export default function App() {
         canRun={Boolean(task.trim() && projectPath.trim())}
         needsProjectPath
         error={error}
+        terminalEvents={terminalEvents}
         timeline={timeline}
         onTaskChange={setTask}
         onTestCommandChange={setTestCommand}

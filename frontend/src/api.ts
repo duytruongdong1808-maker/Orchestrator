@@ -62,6 +62,50 @@ export type OrchestrationResult = {
   message?: string;
 };
 
+export type TerminalEvent =
+  | {
+      type: "run_start";
+      agentName: string;
+      phase: string;
+      command: string;
+      args: string[];
+      cwd: string;
+      timestamp: string;
+    }
+  | {
+      type: "stdin";
+      agentName: string;
+      phase: string;
+      content: string;
+      timestamp: string;
+    }
+  | {
+      type: "output";
+      agentName: string;
+      phase: string;
+      stream: "all";
+      content: string;
+      timestamp: string;
+    }
+  | {
+      type: "run_end";
+      agentName: string;
+      phase: string;
+      exitCode: number | null;
+      timestamp: string;
+      durationMs?: number;
+    }
+  | {
+      type: "orchestration_result";
+      result: OrchestrationResult;
+      timestamp: string;
+    }
+  | {
+      type: "orchestration_error";
+      error: string;
+      timestamp: string;
+    };
+
 const TOKEN_KEY = "orchestrator.apiToken";
 
 export function getStoredApiToken() {
@@ -110,8 +154,78 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body)
     }),
-  listTasks: () => request<Task[]>("/api/tasks"),
-  getTask: (id: string) => request<{ task: Task; agentRuns: AgentRun[]; diffs: DiffRecord[] }>(`/api/tasks/${id}`),
-  approve: (id: string) => request<Task>(`/api/tasks/${id}/approve`, { method: "POST" }),
-  rollback: (id: string) => request<{ task: Task; ok: boolean; message: string }>(`/api/tasks/${id}/rollback`, { method: "POST" })
+  orchestrateStream: async (
+    body: { projectPath: string; userTask: string; testCommand?: string; mode: Mode },
+    onEvent: (event: TerminalEvent) => void
+  ) => {
+    const token = getStoredApiToken();
+    const response = await fetch("/api/orchestrate/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "x-orchestrator-token": token } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : undefined;
+      throw new Error(data?.error ?? `Request failed: ${response.status}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Streaming response was empty.");
+    }
+
+    const decoder = new TextDecoder();
+    const reader = response.body.getReader();
+    let buffer = "";
+    let result: OrchestrationResult | undefined;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line) as TerminalEvent;
+        onEvent(event);
+        if (event.type === "orchestration_result") {
+          result = event.result;
+        }
+        if (event.type === "orchestration_error") {
+          throw new Error(event.error);
+        }
+      }
+    }
+
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      const event = JSON.parse(buffer) as TerminalEvent;
+      onEvent(event);
+      if (event.type === "orchestration_result") {
+        result = event.result;
+      }
+      if (event.type === "orchestration_error") {
+        throw new Error(event.error);
+      }
+    }
+
+    if (!result) {
+      throw new Error("Stream ended before orchestration returned a result.");
+    }
+
+    return result;
+  },
+  listTasks: (projectPath?: string) =>
+    request<Task[]>(projectPath ? `/api/tasks?${new URLSearchParams({ projectPath }).toString()}` : "/api/tasks"),
+  getTask: (id: string) =>
+    request<{ task: Task; agentRuns: AgentRun[]; diffs: DiffRecord[]; changedFiles: string[]; testResult?: { output: string; exitCode: number | null } }>(
+      `/api/tasks/${id}`
+    )
 };

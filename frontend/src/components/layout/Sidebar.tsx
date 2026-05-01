@@ -9,6 +9,7 @@ export function Sidebar({
   apiToken,
   mode,
   tasks,
+  selectedTaskId,
   cliStatus,
   checkingCli,
   onProjectPathChange,
@@ -21,6 +22,7 @@ export function Sidebar({
   apiToken: string;
   mode: Mode;
   tasks: Task[];
+  selectedTaskId?: string;
   cliStatus?: CliStatus;
   checkingCli: boolean;
   onProjectPathChange: (value: string) => void;
@@ -30,12 +32,12 @@ export function Sidebar({
   onSelectTask: (task: Task) => void;
 }) {
   return (
-    <aside className="flex w-[18.5rem] shrink-0 flex-col overflow-hidden rounded-lg border bg-card/78 shadow-soft backdrop-blur">
-      <div className="border-b px-4 py-4">
+    <aside className="flex h-full w-full shrink-0 flex-col overflow-hidden rounded-lg border bg-card/92 shadow-panel backdrop-blur">
+      <div className="border-b px-3 py-3">
         <div className="text-[15px] font-semibold">Repair Console</div>
         <div className="font-mono text-xs text-muted-foreground">Local patch orchestration</div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
         <ProjectPanel
           projectPath={projectPath}
           apiToken={apiToken}
@@ -44,9 +46,12 @@ export function Sidebar({
           onCheckCli={onCheckCli}
           checking={checkingCli}
         />
+        <div className="h-px bg-border/70" />
         <CliStatusPanel status={cliStatus} />
+        <div className="h-px bg-border/70" />
         <ModeSelector value={mode} onChange={onModeChange} />
-        <TaskHistory tasks={tasks} onSelect={onSelectTask} />
+        <div className="h-px bg-border/70" />
+        <TaskHistory tasks={tasks} currentProjectPath={projectPath} selectedTaskId={selectedTaskId} onSelect={onSelectTask} />
       </div>
     </aside>
   );

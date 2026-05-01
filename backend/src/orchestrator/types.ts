@@ -48,3 +48,47 @@ export type OrchestrationResult = {
   status: string;
   message?: string;
 };
+
+export type TerminalEvent =
+  | {
+      type: "run_start";
+      agentName: string;
+      phase: string;
+      command: string;
+      args: string[];
+      cwd: string;
+      timestamp: string;
+    }
+  | {
+      type: "stdin";
+      agentName: string;
+      phase: string;
+      content: string;
+      timestamp: string;
+    }
+  | {
+      type: "output";
+      agentName: string;
+      phase: string;
+      stream: "all";
+      content: string;
+      timestamp: string;
+    }
+  | {
+      type: "run_end";
+      agentName: string;
+      phase: string;
+      exitCode: number | null;
+      timestamp: string;
+      durationMs?: number;
+    }
+  | {
+      type: "orchestration_result";
+      result: OrchestrationResult;
+      timestamp: string;
+    }
+  | {
+      type: "orchestration_error";
+      error: string;
+      timestamp: string;
+    };

@@ -1,19 +1,14 @@
-import { execa } from "execa";
+import { runCliCommand, type CliRunObserver } from "./cliRunner.js";
 import type { CliRunResult } from "../orchestrator/types.js";
 
-export async function runCodex(cwd: string, prompt: string): Promise<CliRunResult> {
-  const result = await execa("codex", ["exec", "-"], {
+export async function runCodex(cwd: string, prompt: string, phase = "unknown", onEvent?: CliRunObserver): Promise<CliRunResult> {
+  return runCliCommand({
     cwd,
-    all: true,
-    input: prompt,
-    shell: false,
-    reject: false
+    command: "codex",
+    args: ["exec", "-"],
+    stdin: prompt,
+    agentName: "Codex",
+    phase,
+    onEvent
   });
-
-  return {
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
-    output: result.all ?? [result.stdout, result.stderr].filter(Boolean).join("\n"),
-    exitCode: result.exitCode ?? null
-  };
 }

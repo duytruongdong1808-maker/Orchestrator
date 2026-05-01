@@ -134,7 +134,10 @@ export const database = {
     return row ? mapTask(row) : undefined;
   },
 
-  listTasks(): Task[] {
+  listTasks(projectPath?: string): Task[] {
+    if (projectPath) {
+      return db.prepare("SELECT * FROM tasks WHERE lower(project_path) = lower(?) ORDER BY created_at DESC LIMIT 50").all(projectPath).map(mapTask);
+    }
     return db.prepare("SELECT * FROM tasks ORDER BY created_at DESC LIMIT 50").all().map(mapTask);
   },
 

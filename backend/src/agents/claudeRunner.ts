@@ -1,19 +1,14 @@
-import { execa } from "execa";
+import { runCliCommand, type CliRunObserver } from "./cliRunner.js";
 import type { CliRunResult } from "../orchestrator/types.js";
 
-export async function runClaude(cwd: string, prompt: string): Promise<CliRunResult> {
-  const result = await execa("claude", ["-p"], {
+export async function runClaude(cwd: string, prompt: string, phase = "unknown", onEvent?: CliRunObserver): Promise<CliRunResult> {
+  return runCliCommand({
     cwd,
-    all: true,
-    shell: false,
-    input: prompt,
-    reject: false
+    command: "claude",
+    args: ["-p"],
+    stdin: prompt,
+    agentName: "Claude",
+    phase,
+    onEvent
   });
-
-  return {
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
-    output: result.all ?? [result.stdout, result.stderr].filter(Boolean).join("\n"),
-    exitCode: result.exitCode ?? null
-  };
 }

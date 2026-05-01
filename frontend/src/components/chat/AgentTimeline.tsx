@@ -15,29 +15,37 @@ const icons = {
 
 export function AgentTimeline({ steps }: { steps: TimelineStep[] }) {
   return (
-    <div className="flex gap-1.5 overflow-x-auto rounded-lg border bg-muted/35 p-1.5">
-      {steps.map((step) => {
+    <div className="flex min-w-0 items-center overflow-x-auto rounded-md border bg-muted/25 px-3 py-2">
+      {steps.map((step, index) => {
         const Icon = icons[step.status];
+        const isActive = step.status === "running";
+        const connectorDone = steps.slice(0, index + 1).every((item) => item.status === "complete");
         return (
-          <div
-            key={step.label}
-            className={cn(
-              "flex min-w-28 flex-1 items-center gap-2 rounded-md border border-transparent px-2.5 py-2 transition",
-              step.status === "running" && "border-primary/35 bg-primary/10",
-              step.status === "complete" && "bg-card",
-              step.status === "failed" && "border-red-500/30 bg-red-500/10"
-            )}
-          >
-            <Icon
-              className={cn(
-                "h-3.5 w-3.5 shrink-0",
-                step.status === "running" && "animate-spin text-primary",
-                step.status === "complete" && "text-emerald-600",
-                step.status === "failed" && "text-red-600",
-                step.status === "pending" && "text-muted-foreground"
-              )}
-            />
-            <span className="truncate font-mono text-[11px] font-medium text-muted-foreground">{step.label}</span>
+          <div key={step.label} className="flex min-w-24 flex-1 items-center">
+            <div className="flex min-w-0 items-center gap-2" aria-current={isActive ? "step" : undefined}>
+              <span
+                className={cn(
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-background",
+                  isActive && "h-7 w-7 border-primary bg-primary/10",
+                  step.status === "complete" && "border-emerald-500/60 bg-emerald-500/10",
+                  step.status === "failed" && "border-red-500/60 bg-red-500/10"
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    isActive && "animate-spin text-primary",
+                    step.status === "complete" && "text-emerald-500",
+                    step.status === "failed" && "text-red-500",
+                    step.status === "pending" && "text-muted-foreground"
+                  )}
+                />
+              </span>
+              <span className={cn("truncate font-mono text-[11px] font-medium", step.status === "pending" ? "text-muted-foreground" : "text-foreground")}>
+                {step.label}
+              </span>
+            </div>
+            {index < steps.length - 1 ? <div className={cn("mx-2 h-px min-w-6 flex-1", connectorDone ? "bg-primary/70" : "bg-border")} /> : null}
           </div>
         );
       })}

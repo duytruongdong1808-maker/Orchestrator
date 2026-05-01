@@ -6,7 +6,7 @@ export function Tabs({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
 }
 
 export function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("grid rounded-md border bg-muted p-1", className)} {...props} />;
+  return <div className={cn("grid rounded-md border bg-muted p-1", className)} role="tablist" {...props} />;
 }
 
 export function TabsTrigger({
@@ -17,10 +17,12 @@ export function TabsTrigger({
   return (
     <button
       className={cn(
-        "rounded px-3 py-1.5 text-xs font-medium text-muted-foreground transition",
+        "rounded px-3 py-1.5 text-xs font-medium text-muted-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55",
         active && "bg-card text-foreground shadow-sm",
         className
       )}
+      role="tab"
+      aria-selected={active}
       {...props}
     />
   );

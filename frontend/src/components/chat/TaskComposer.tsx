@@ -55,7 +55,7 @@ export function TaskComposer({
 
   return (
     <div className="border-t bg-card/90 p-4 backdrop-blur">
-      <div className="mx-auto max-w-4xl space-y-3">
+      <div className="mx-auto max-w-5xl space-y-3">
         <div className="flex flex-wrap gap-2">
           {presets.map((preset) => {
             const Icon = preset.icon;
@@ -82,8 +82,8 @@ export function TaskComposer({
           disabled={running}
           className="min-h-28 border-border/80 bg-background/80 font-mono text-[13px] shadow-inner"
         />
-        <div className="flex flex-col gap-3 xl:flex-row">
-          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+          <div className="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row">
             <Input
               value={testCommand}
               onChange={(event) => onTestCommandChange(event.target.value)}
@@ -107,7 +107,7 @@ export function TaskComposer({
               ))}
             </div>
           </div>
-          <Button className="xl:w-36" onClick={onRun} disabled={running || !canRun}>
+          <Button className="w-full xl:w-36" onClick={onRun} disabled={running || !canRun}>
             {needsProjectPath ? <Terminal className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {running ? "Running" : "Run"}
           </Button>

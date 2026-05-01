@@ -5,8 +5,9 @@ import express from "express";
 import { z } from "zod";
 import { checkCli } from "./agents/cliCheck.js";
 import { database } from "./db/database.js";
-import { rollbackWorkingTree } from "./git/gitService.js";
+import { getChangedFilesFromDiff } from "./git/gitService.js";
 import { orchestrateCodeFix } from "./orchestrator/orchestrateCodeFix.js";
+import type { TerminalEvent } from "./orchestrator/types.js";
 
 const router = express.Router();
 
@@ -153,8 +154,51 @@ router.post("/orchestrate", requireApiToken, async (req, res, next) => {
   }
 });
 
-router.get("/tasks", requireApiToken, (_req, res) => {
-  res.json(database.listTasks());
+router.post("/orchestrate/stream", requireApiToken, async (req, res, next) => {
+  let streamStarted = false;
+
+  function writeEvent(event: TerminalEvent) {
+    res.write(`${JSON.stringify(event)}\n`);
+  }
+
+  try {
+    const input = orchestrateSchema.parse(req.body);
+    if (input.mode !== "chat" && !input.projectPath) {
+      throw new Error("Project path is required for code modes.");
+    }
+
+    streamStarted = true;
+    res.status(200);
+    res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    const result = await orchestrateCodeFix(input, { onEvent: writeEvent });
+    writeEvent({
+      type: "orchestration_result",
+      result,
+      timestamp: new Date().toISOString()
+    });
+    res.end();
+  } catch (error) {
+    if (!streamStarted) {
+      next(error);
+      return;
+    }
+
+    writeEvent({
+      type: "orchestration_error",
+      error: error instanceof Error ? error.message : "Unknown error",
+      timestamp: new Date().toISOString()
+    });
+    res.end();
+  }
+});
+
+router.get("/tasks", requireApiToken, (req, res) => {
+  const projectPath = typeof req.query.projectPath === "string" && req.query.projectPath.trim() ? req.query.projectPath.trim() : undefined;
+  res.json(database.listTasks(projectPath));
 });
 
 router.get("/tasks/:id", requireApiToken, (req, res) => {
@@ -163,35 +207,17 @@ router.get("/tasks/:id", requireApiToken, (req, res) => {
     res.status(404).json({ error: "Task not found" });
     return;
   }
+  const agentRuns = database.listAgentRuns(task.id);
+  const diffs = database.listDiffs(task.id);
+  const finalDiff = diffs[diffs.length - 1]?.diffText ?? "";
+  const testRun = [...agentRuns].reverse().find((run) => run.phase === "test");
   res.json({
     task,
-    agentRuns: database.listAgentRuns(task.id),
-    diffs: database.listDiffs(task.id)
+    agentRuns,
+    diffs,
+    changedFiles: getChangedFilesFromDiff(finalDiff),
+    testResult: testRun ? { output: testRun.output, exitCode: testRun.exitCode } : undefined
   });
-});
-
-router.post("/tasks/:id/approve", requireApiToken, (req, res) => {
-  const task = database.getTask(String(req.params.id));
-  if (!task) {
-    res.status(404).json({ error: "Task not found" });
-    return;
-  }
-  res.json(database.updateTaskStatus(task.id, "approved"));
-});
-
-router.post("/tasks/:id/rollback", requireApiToken, async (req, res, next) => {
-  try {
-    const task = database.getTask(String(req.params.id));
-    if (!task) {
-      res.status(404).json({ error: "Task not found" });
-      return;
-    }
-    await rollbackWorkingTree(task);
-    const updated = database.updateTaskStatus(task.id, "rolled_back");
-    res.json({ task: updated, ok: true, message: "Rollback completed." });
-  } catch (error) {
-    next(error);
-  }
 });
 
 export { router };
